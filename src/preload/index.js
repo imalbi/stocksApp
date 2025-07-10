@@ -1,20 +1,28 @@
-import { contextBridge } from 'electron'
-import { electronAPI } from '@electron-toolkit/preload'
+import { contextBridge, ipcRenderer } from 'electron'
 
-// Custom APIs for renderer
-const api = {}
+// Espone solo le API custom necessarie al renderer
+const product = {
+  add: (data) => ipcRenderer.invoke('db:addProduct', data),
+  getAll: () => ipcRenderer.invoke('db:getAllProducts'),
+  getById: (barCode) => ipcRenderer.invoke('db:getProductById', barCode)
+  // ...altre funzioni come updateQuantity
+}
 
-// Use `contextBridge` APIs to expose Electron APIs to
-// renderer only if context isolation is enabled, otherwise
-// just add to the DOM global.
+const api = { product }
+
+api.onDbUpdate = (callback) => {
+  // Usa ipcRenderer.on (non .handle) per ascoltare eventi in arrivo.
+  // Quando arriva un messaggio sul canale 'db-updated',
+  // esegui la funzione di callback che ti è stata passata dal codice Svelte.
+  ipcRenderer.on('db-updated', (event, ...args) => callback(...args))
+}
+
 if (process.contextIsolated) {
   try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
   } catch (error) {
     console.error(error)
   }
 } else {
-  window.electron = electronAPI
   window.api = api
 }

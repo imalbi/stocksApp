@@ -2,10 +2,13 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import dbManager from './database.js'
+
+let mainWindow
 
 function createWindow() {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
@@ -42,15 +45,37 @@ app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
+  // Inizializza il database
+  dbManager.initializeDatabase()
+
+  // Gestione IPC per il database
+  ipcMain.handle('db:addProduct', async (_event, productData) => {
+    const result = dbManager.addProduct(productData)
+    if (!result) {
+      throw new Error('Failed to add product')
+    }
+    if (result && mainWindow) {
+      mainWindow.webContents.send('db-updated', productData)
+    }
+    return result
+  })
+
+  ipcMain.handle('db:getAllProducts', async () => {
+    return dbManager.getAllProducts()
+  })
+
+  ipcMain.handle('db:getProductById', async (_event, barCode) => {
+    return dbManager.getProductById(barCode)
+  })
+
+  //Gestione modifiche db
+
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
-
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
 
   createWindow()
 
